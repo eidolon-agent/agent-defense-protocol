@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { GameCanvas } from '../components/GameCanvas';
 import { UIControls } from '../components/UIControls';
 import { GameLoop } from '../app/game/GameLoop';
@@ -21,10 +21,13 @@ export default function Home() {
     score,
     wave,
     isRunning,
-    phase
+    phase,
+    placeAgent,
+    remainingAgentsToPlace
   } = useGameStore();
 
   const [canvasSize, setCanvasSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateSize = () => {
@@ -40,12 +43,41 @@ export default function Home() {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (phase !== 'PLACEMENT') return;
+    if (remainingAgentsToPlace <= 0) return;
+
+    const rect = canvasContainerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // Scale click coordinates from rendered size to logical canvas size (1000x600)
+    const scaleX = CANVAS_WIDTH / rect.width;
+    const scaleY = CANVAS_HEIGHT / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    // Only allow placement on left side (logical x < 200)
+    if (x > 200) return;
+
+    // Determine agent type based on counts
+    const defenders = agents.filter(a => a.type === 'DEFENDER').length;
+    const snipers = agents.filter(a => a.type === 'SNIPER').length;
+    const type: 'DEFENDER' | 'SNIPER' = defenders <= snipers ? 'DEFENDER' : 'SNIPER';
+
+    placeAgent(type, x, y);
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-900 text-white">
       <UIControls canvasWidth={canvasSize.width} canvasHeight={canvasSize.height} />
 
       <main className="flex-1 flex items-center justify-center p-4">
-        <div className="relative">
+        <div
+          ref={canvasContainerRef}
+          className="relative cursor-crosshair"
+          onClick={handleCanvasClick}
+          style={{ width: canvasSize.width, height: canvasSize.height }}
+        >
           <GameCanvas
             agents={agents}
             enemies={enemies}
@@ -59,7 +91,7 @@ export default function Home() {
           />
           {phase === 'PLACEMENT' && (
             <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 px-3 py-1 rounded text-xs text-white">
-              Click on left side to place agents (max 5)
+              Click on left side to place agents ({remainingAgentsToPlace} remaining)
             </div>
           )}
         </div>
