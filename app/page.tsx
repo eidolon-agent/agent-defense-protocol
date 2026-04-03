@@ -28,6 +28,7 @@ export default function Home() {
 
   const [canvasSize, setCanvasSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [clickMarker, setClickMarker] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const updateSize = () => {
@@ -50,16 +51,17 @@ export default function Home() {
     const rect = canvasContainerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Scale click coordinates from rendered size to logical canvas size (1000x600)
     const scaleX = CANVAS_WIDTH / rect.width;
     const scaleY = CANVAS_HEIGHT / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
-    // Only allow placement on left side (logical x < 200)
     if (x > 200) return;
 
-    // Determine agent type based on counts
+    // Debug: show click marker
+    setClickMarker({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setTimeout(() => setClickMarker(null), 500);
+
     const defenders = agents.filter(a => a.type === 'DEFENDER').length;
     const snipers = agents.filter(a => a.type === 'SNIPER').length;
     const type: 'DEFENDER' | 'SNIPER' = defenders <= snipers ? 'DEFENDER' : 'SNIPER';
@@ -93,6 +95,19 @@ export default function Home() {
             <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 px-3 py-1 rounded text-xs text-white">
               Click on left side to place agents ({remainingAgentsToPlace} remaining)
             </div>
+          )}
+          {/* Debug click marker */}
+          {clickMarker && (
+            <div
+              className="absolute rounded-full border-2 border-yellow-300"
+              style={{
+                left: clickMarker.x,
+                top: clickMarker.y,
+                width: 16,
+                height: 16,
+                transform: 'translate(-50%, -50%)'
+              }}
+            />
           )}
         </div>
       </main>
