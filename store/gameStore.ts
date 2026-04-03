@@ -126,15 +126,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const newAgent = createAgent(generateId(), { type, position: { x, y }, personality });
 
-    set(state => ({
-      agents: [...state.agents, newAgent],
-      remainingAgentsToPlace: state.remainingAgentsToPlace - 1,
-      gold: state.gold - cost
-    }));
-
-    if (get().remainingAgentsToPlace - 1 <= 0) {
-      setTimeout(() => set({ phase: 'FIGHT', wave: 1, enemySpawnTimer: 0 }), 500);
-    }
+    set(state => {
+      const newRemaining = state.remainingAgentsToPlace - 1;
+      return {
+        agents: [...state.agents, newAgent],
+        remainingAgentsToPlace: newRemaining,
+        gold: state.gold - cost,
+        // If this was the last agent, start fight after short delay
+        ...(newRemaining <= 0 ? { phase: 'FIGHT' as GamePhase, wave: 1, enemySpawnTimer: 0 } : {})
+      };
+    });
   },
 
   startNextWave: () => {
