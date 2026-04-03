@@ -18,6 +18,8 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
     wave,
     score,
     gold,
+    elixir,
+    maxElixir,
     placementTime,
     agents,
     upgradeSelection,
@@ -149,6 +151,13 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
       <div className="bg-gray-800 p-2 rounded mt-2 text-center">
         <div className="text-xs text-gray-400">Gold</div>
         <div className="text-lg font-bold text-yellow-400">{gold}</div>
+      </div>
+      <div className="bg-gray-800 p-2 rounded mt-2">
+        <div className="text-xs text-gray-400 mb-1">Elixir</div>
+        <div className="h-4 bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${(elixir / (maxElixir || 10)) * 100}%` }} />
+        </div>
+        <div className="text-right text-xs text-blue-300">{elixir.toFixed(1)} / {maxElixir}</div>
       </div>
 
       {phase === 'PLACEMENT' && (

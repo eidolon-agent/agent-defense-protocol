@@ -119,6 +119,9 @@ export interface GameState {
   wave: number;
   score: number;
   gold: number; // currency for upgrades
+  elixir: number; // current elixir
+  maxElixir: number;
+  elixirRegenRate: number; // per second
   enemySpawnTimer: number;
   gameTime: number;
   isRunning: boolean;

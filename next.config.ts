@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {
+    workerMemoryBufferMB: 512,
+  },
 };
 
 export default nextConfig;

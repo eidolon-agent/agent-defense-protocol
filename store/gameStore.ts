@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   GameState, Agent, Enemy, Bullet, Command, Particle, DamageNumber, ScreenShake, GamePhase,
-  EnemyType, AgentAbility
+  EnemyType, AgentType, AgentAbility
 } from '../app/game/types';
 import {
   createAgent, upgradeAgent, grantUpgradePoint, getEffectiveRange, getEffectiveDamage, getEffectiveFireRate, agentCanShoot, shoot,
@@ -25,6 +25,11 @@ const UPGRADE_COSTS = {
   range: 40,
   fireRate: 60,
   ability: 100
+};
+
+const ABILITY_COSTS: Record<AgentType, number> = {
+  DEFENDER: 3, // AOE cost
+  SNIPER: 2   // Slow cost
 };
 
 const AGENT_SELL_VALUE = 0.7; // 70% refund
@@ -76,6 +81,9 @@ const createInitialState = (): GameState => ({
   wave: 1,
   score: 0,
   gold: 500, // starting gold
+  elixir: 5,
+  maxElixir: 10,
+  elixirRegenRate: 1, // per second
   enemySpawnTimer: 0,
   gameTime: 0,
   isRunning: false,
@@ -117,6 +125,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         wave: 1,
         enemySpawnTimer: 0,
         gold: 500,
+        elixir: 5,
         lives: 5,
         remainingAgentsToPlace: 0
       });
@@ -363,14 +372,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return clone;
     });
 
+    // Elixir regeneration
+    let currentElixir = state.elixir + state.elixirRegenRate * deltaTime;
+
     // 3. Agents shoot + abilities
     const newBullets: Bullet[] = [...state.bullets];
     const abilitiesUsed: Array<{ agentId: string; effect: any }> = [];
 
     updatedAgents.forEach(agent => {
+      // Check ability
       const abilityEffect = useAbility(agent, movedEnemies, now);
       if (abilityEffect) {
-        abilitiesUsed.push({ agentId: agent.id, effect: abilityEffect });
+        const cost = agent.type === 'DEFENDER' ? 3 : 2; // Defender AOE costs 3, Sniper Slow costs 2
+        if (currentElixir >= cost) {
+          abilitiesUsed.push({ agentId: agent.id, effect: abilityEffect });
+          currentElixir -= cost;
+        }
       }
 
       if (!agentCanShoot(agent, now)) return;
