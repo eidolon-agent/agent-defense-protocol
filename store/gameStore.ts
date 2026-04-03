@@ -109,15 +109,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   placeAgent: (type, x, y) => {
     const state = get();
-    if (state.phase !== 'PLACEMENT') return;
-    if (state.remainingAgentsToPlace <= 0) return;
+    console.log('[DEBUG] placeAgent', { type, x, y, phase: state.phase, remaining: state.remainingAgentsToPlace, gold: state.gold, agentsCount: state.agents.length });
+    if (state.phase !== 'PLACEMENT') {
+      console.log('[DEBUG] reject: not PLACEMENT');
+      return;
+    }
+    if (state.remainingAgentsToPlace <= 0) {
+      console.log('[DEBUG] reject: none remaining');
+      return;
+    }
 
     // Check if position already occupied
     const occupied = state.agents.some(a => Math.abs(a.position.x - x) < 30 && Math.abs(a.position.y - y) < 30);
-    if (occupied) return;
+    if (occupied) {
+      console.log('[DEBUG] reject: occupied');
+      return;
+    }
 
     const cost = type === 'DEFENDER' ? 40 : 60;
-    if (state.gold < cost) return; // Not enough gold
+    if (state.gold < cost) {
+      console.log('[DEBUG] reject: insufficient gold');
+      return;
+    }
 
     const defenders = state.agents.filter(a => a.type === 'DEFENDER').length;
     const snipers = state.agents.filter(a => a.type === 'SNIPER').length;
@@ -128,6 +141,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set(state => {
       const newRemaining = state.remainingAgentsToPlace - 1;
+      console.log('[DEBUG] setState newRemaining:', newRemaining, 'agents before:', state.agents.length);
       return {
         agents: [...state.agents, newAgent],
         remainingAgentsToPlace: newRemaining,
