@@ -17,6 +17,7 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
     phase,
     wave,
     score,
+    gold,
     placementTime,
     agents,
     upgradeSelection,
@@ -27,7 +28,8 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
     placeAgent,
     selectAgentForUpgrade,
     upgradeSelectedAgent,
-    createParticle
+    createParticle,
+    sellAgent
   } = useGameStore();
 
   const commands: { cmd: Command; label: string; color: string }[] = [
@@ -35,20 +37,6 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
     { cmd: 'STRONG', label: 'Strongest', color: 'bg-red-600 hover:bg-red-700' },
     { cmd: 'BASE', label: 'Protect Base', color: 'bg-blue-600 hover:bg-blue-700' },
   ];
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (phase !== 'PLACEMENT') return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // Determine which agent type to place based on UI selection (toggle between DEFENDER/SNIPER)
-    const defenderCount = agents.filter(a => a.type === 'DEFENDER').length;
-    const sniperCount = agents.filter(a => a.type === 'SNIPER').length;
-    const type: 'DEFENDER' | 'SNIPER' = defenderCount <= sniperCount ? 'DEFENDER' : 'SNIPER';
-
-    placeAgent(type, x, y);
-  };
 
   const renderUpgradePanel = () => {
     if (upgradeSelection) {
@@ -106,17 +94,29 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
           {agents.map(agent => (
             <div
               key={agent.id}
-              className={`p-2 rounded cursor-pointer flex justify-between items-center ${
+              className={`p-2 rounded flex justify-between items-center ${
                 agent.upgradePoints > 0 ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800'
               }`}
-              onClick={() => agent.upgradePoints > 0 && selectAgentForUpgrade(agent.id)}
             >
-              <div className="text-white text-sm">
+              <div
+                className="text-white text-sm cursor-pointer flex-1"
+                onClick={() => agent.upgradePoints > 0 && selectAgentForUpgrade(agent.id)}
+              >
                 {agent.type} (Lvl {agent.level}) • Pts: {agent.upgradePoints}
+                {agent.upgradePoints > 0 && (
+                  <span className="text-yellow-400 font-bold ml-2">UPGRADE</span>
+                )}
               </div>
-              {agent.upgradePoints > 0 && (
-                <span className="text-yellow-400 font-bold">UPGRADE</span>
-              )}
+              <button
+                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sellAgent(agent.id);
+                }}
+                title="Sell agent for 70% refund"
+              >
+                Sell
+              </button>
             </div>
           ))}
         </div>
@@ -145,6 +145,10 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
           <div className="text-xs text-gray-400">Wave</div>
           <div className="text-lg font-bold">{wave}</div>
         </div>
+      </div>
+      <div className="bg-gray-800 p-2 rounded mt-2 text-center">
+        <div className="text-xs text-gray-400">Gold</div>
+        <div className="text-lg font-bold text-yellow-400">{gold}</div>
       </div>
 
       {phase === 'PLACEMENT' && (

@@ -75,7 +75,7 @@ const createInitialState = (): GameState => ({
   currentCommand: 'BASE',
   wave: 1,
   score: 0,
-  gold: 200, // starting gold
+  gold: 500, // starting gold
   enemySpawnTimer: 0,
   gameTime: 0,
   isRunning: false,
@@ -116,7 +116,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const occupied = state.agents.some(a => Math.abs(a.position.x - x) < 30 && Math.abs(a.position.y - y) < 30);
     if (occupied) return;
 
-    const cost = type === 'DEFENDER' ? 50 : 80;
+    const cost = type === 'DEFENDER' ? 40 : 60;
     if (state.gold < cost) return; // Not enough gold
 
     const defenders = state.agents.filter(a => a.type === 'DEFENDER').length;
@@ -192,7 +192,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   addAgent: (type, x, y, personality) => {
-    const cost = type === 'DEFENDER' ? 50 : 80;
+    const cost = type === 'DEFENDER' ? 40 : 60;
     if (get().gold < cost) return;
     const newAgent = createAgent(generateId(), { type, position: { x, y }, personality });
     set(state => ({ agents: [...state.agents, newAgent], gold: state.gold - cost }));
