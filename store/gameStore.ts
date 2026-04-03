@@ -97,7 +97,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
   startGame: () => {
     const state = get();
     if (state.agents.length === 0) {
-      set({ isRunning: true, phase: 'PLACEMENT', placementTime: 30, remainingAgentsToPlace: 5, agents: [], gold: 500, lives: 5 });
+      const newAgents: Agent[] = [];
+      const positions = [
+        { x: 100, y: 120 },
+        { x: 100, y: 200 },
+        { x: 100, y: 280 },
+        { x: 100, y: 360 },
+        { x: 100, y: 440 },
+      ];
+      const types: ('DEFENDER' | 'SNIPER')[] = ['DEFENDER', 'DEFENDER', 'SNIPER', 'SNIPER', 'DEFENDER'];
+      positions.forEach((pos, i) => {
+        const personality: 'AGGRESSIVE' | 'DEFENSIVE' = i % 2 === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
+        newAgents.push(createAgent(generateId(), { type: types[i], position: pos, personality }));
+      });
+      set({
+        agents: newAgents,
+        isRunning: true,
+        phase: 'FIGHT',
+        wave: 1,
+        enemySpawnTimer: 0,
+        gold: 500,
+        lives: 5,
+        remainingAgentsToPlace: 0
+      });
     } else {
       set({ phase: 'FIGHT', wave: 1, enemySpawnTimer: 0, gameTime: 0, isRunning: true });
     }
