@@ -119,12 +119,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    // Check if position already occupied
-    const occupied = state.agents.some(a => Math.abs(a.position.x - x) < 30 && Math.abs(a.position.y - y) < 30);
-    if (occupied) {
-      console.log('[DEBUG] reject: occupied');
+    // Snap to nearest placement slot (x=100, y in PLACEMENT_Y)
+    const SNAP_RADIUS = 50;
+    let nearestIdx: number | null = null;
+    let minDist = Infinity;
+    PLACEMENT_Y.forEach((slotY, idx) => {
+      const isOccupied = state.agents.some(a => Math.abs(a.position.x - 100) < 20 && Math.abs(a.position.y - slotY) < 20);
+      if (isOccupied) return;
+      const dist = Math.hypot(x - 100, y - slotY);
+      if (dist < SNAP_RADIUS && dist < minDist) {
+        minDist = dist;
+        nearestIdx = idx;
+      }
+    });
+
+    if (nearestIdx === null) {
+      console.log('[DEBUG] reject: no slot nearby');
       return;
     }
+
+    const slotX = 100;
+    const slotY = PLACEMENT_Y[nearestIdx];
 
     const cost = type === 'DEFENDER' ? 40 : 60;
     if (state.gold < cost) {
@@ -137,7 +152,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const personality: 'AGGRESSIVE' | 'DEFENSIVE' =
       (type === 'DEFENDER' ? defenders % 2 : snipers % 2) === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
 
-    const newAgent = createAgent(generateId(), { type, position: { x, y }, personality });
+    const newAgent = createAgent(generateId(), { type, position: { x: slotX, y: slotY }, personality });
 
     set(state => {
       const newRemaining = state.remainingAgentsToPlace - 1;
@@ -146,7 +161,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
         agents: [...state.agents, newAgent],
         remainingAgentsToPlace: newRemaining,
         gold: state.gold - cost,
-        // If this was the last agent, start fight after short delay
         ...(newRemaining <= 0 ? { phase: 'FIGHT' as GamePhase, wave: 1, enemySpawnTimer: 0 } : {})
       };
     });
