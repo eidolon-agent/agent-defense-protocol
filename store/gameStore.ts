@@ -97,7 +97,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   startGame: () => {
     const state = get();
     if (state.agents.length === 0) {
-      set({ isRunning: true, phase: 'PLACEMENT', placementTime: 30, remainingAgentsToPlace: 5, agents: [], gold: 200, lives: 5 });
+      set({ isRunning: true, phase: 'PLACEMENT', placementTime: 30, remainingAgentsToPlace: 5, agents: [], gold: 500, lives: 5 });
     } else {
       set({ phase: 'FIGHT', wave: 1, enemySpawnTimer: 0, gameTime: 0, isRunning: true });
     }

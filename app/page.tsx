@@ -56,8 +56,6 @@ export default function Home() {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
-    if (x > 500) return;
-
     // Debug: show click marker
     setClickMarker({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     setTimeout(() => setClickMarker(null), 500);
