@@ -118,41 +118,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log('[DEBUG] reject: none remaining');
       return;
     }
-
-    // Snap to nearest placement slot (x=100, y in PLACEMENT_Y)
-    const SNAP_RADIUS = 50;
-    let nearestIdx: number | null = null;
-    let minDist = Infinity;
-    PLACEMENT_Y.forEach((slotY, idx) => {
-      const isOccupied = state.agents.some(a => Math.abs(a.position.x - 100) < 20 && Math.abs(a.position.y - slotY) < 20);
-      if (isOccupied) return;
-      const dist = Math.hypot(x - 100, y - slotY);
-      if (dist < SNAP_RADIUS && dist < minDist) {
-        minDist = dist;
-        nearestIdx = idx;
-      }
-    });
-
-    if (nearestIdx === null) {
-      console.log('[DEBUG] reject: no slot nearby');
-      return;
-    }
-
-    const slotX = 100;
-    const slotY = PLACEMENT_Y[nearestIdx];
-
     const cost = type === 'DEFENDER' ? 40 : 60;
     if (state.gold < cost) {
       console.log('[DEBUG] reject: insufficient gold');
       return;
     }
 
+    // Simple placement: directly at clicked position (left side enforced in UI)
     const defenders = state.agents.filter(a => a.type === 'DEFENDER').length;
     const snipers = state.agents.filter(a => a.type === 'SNIPER').length;
     const personality: 'AGGRESSIVE' | 'DEFENSIVE' =
       (type === 'DEFENDER' ? defenders % 2 : snipers % 2) === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
 
-    const newAgent = createAgent(generateId(), { type, position: { x: slotX, y: slotY }, personality });
+    const newAgent = createAgent(generateId(), { type, position: { x, y }, personality });
 
     set(state => {
       const newRemaining = state.remainingAgentsToPlace - 1;
