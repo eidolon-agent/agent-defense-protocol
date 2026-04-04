@@ -199,6 +199,70 @@ export const UIControls: React.FC<UIControlsProps> = ({ canvasWidth, canvasHeigh
 
       {renderUpgradePanel()}
 
+      {/* Wallet Connect / Save Load */}
+      <div className="bg-gray-800 p-3 rounded mt-2">
+        {!connectedWallet ? (
+          <div className="space-y-2">
+            <input
+              type="text"
+              placeholder="Paste wallet address (0x...)"
+              className="w-full px-2 py-1 bg-gray-700 text-white text-xs rounded"
+              value={walletInput}
+              onChange={e => setWalletInput(e.target.value)}
+            />
+            <button
+              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm"
+              onClick={() => {
+                if (walletInput.trim()) {
+                  setWalletAddress(walletInput.trim());
+                  setWalletStatus('connected');
+                }
+              }}
+            >
+              Connect Wallet
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-xs text-gray-300 truncate">
+              Wallet: {connectedWallet.slice(0, 6)}...{connectedWallet.slice(-4)}
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                onClick={() => {
+                  saveGame(connectedWallet!);
+                  alert('Game saved!');
+                }}
+              >
+                Save
+              </button>
+              <button
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                onClick={() => {
+                  if (loadGame(connectedWallet!)) {
+                    alert('Game loaded!');
+                  } else {
+                    alert('No save data found for this wallet.');
+                  }
+                }}
+              >
+                Load
+              </button>
+              <button
+                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+                onClick={() => {
+                  setWalletAddress(null);
+                  setWalletStatus('idle');
+                }}
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="pt-4 border-t border-gray-700">
         {phase === 'PLACEMENT' ? (
           <button
