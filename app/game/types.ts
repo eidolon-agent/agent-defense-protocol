@@ -89,7 +89,7 @@ export interface Particle {
   type?: 'hit' | 'heal' | 'slow' | 'aoe' | 'buff' | 'gold';
 }
 
-export type GamePhase = 'PLACEMENT' | 'FIGHT' | 'BETWEEN_WAVES';
+export type GamePhase = 'PLACEMENT' | 'FIGHT' | 'BETWEEN_WAVES' | 'GAME_OVER';
 
 export interface DamageNumber {
   id: string;
