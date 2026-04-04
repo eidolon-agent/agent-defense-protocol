@@ -45,6 +45,16 @@ const BASE_ENEMY_STATS = {
     healAmount: 0,
     healRadius: 0,
     healCooldown: 0
+  },
+  BOSS: {
+    speed: 0.7,
+    maxHp: 300,
+    radius: 20,
+    color: '#dc2626',
+    armor: 10,
+    healAmount: 0,
+    healRadius: 0,
+    healCooldown: 0
   }
 };
 

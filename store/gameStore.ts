@@ -63,11 +63,11 @@ const PLACEMENT_Y = [120, 200, 280, 360, 440];
 
 // Enemy wave compositions (by wave)
 const WAVE_COMPOSITION = [
-  { fast: 3, tank: 1, healer: 0, armored: 0, hasBoss: false },
-  { fast: 5, tank: 2, healer: 1, armored: 1, hasBoss: false },
-  { fast: 8, tank: 3, healer: 2, armored: 2, hasBoss: false },
-  { fast: 12, tank: 4, healer: 3, armored: 3, hasBoss: true },
-  { fast: 15, tank: 5, healer: 4, armored: 4, hasBoss: true },
+  { fast: 3, tank: 1, healer: 0, armored: 0, boss: 0 },
+  { fast: 5, tank: 2, healer: 1, armored: 1, boss: 0 },
+  { fast: 8, tank: 3, healer: 2, armored: 2, boss: 0 },
+  { fast: 12, tank: 4, healer: 3, armored: 3, boss: 1 },
+  { fast: 15, tank: 5, healer: 4, armored: 4, boss: 2 },
 ];
 
 const createInitialState = (): GameState => ({
@@ -103,35 +103,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setCommand: (cmd: Command) => set({ currentCommand: cmd }),
 
   startGame: () => {
-    const state = get();
-    if (state.agents.length === 0) {
-      const newAgents: Agent[] = [];
-      const positions = [
-        { x: 100, y: 120 },
-        { x: 100, y: 200 },
-        { x: 100, y: 280 },
-        { x: 100, y: 360 },
-        { x: 100, y: 440 },
-      ];
-      const types: ('DEFENDER' | 'SNIPER')[] = ['DEFENDER', 'DEFENDER', 'SNIPER', 'SNIPER', 'DEFENDER'];
-      positions.forEach((pos, i) => {
-        const personality: 'AGGRESSIVE' | 'DEFENSIVE' = i % 2 === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
-        newAgents.push(createAgent(generateId(), { type: types[i], position: pos, personality }));
-      });
-      set({
-        agents: newAgents,
-        isRunning: true,
-        phase: 'FIGHT',
-        wave: 1,
-        enemySpawnTimer: 0,
-        gold: 500,
-        elixir: 5,
-        lives: 5,
-        remainingAgentsToPlace: 0
-      });
-    } else {
-      set({ phase: 'FIGHT', wave: 1, enemySpawnTimer: 0, gameTime: 0, isRunning: true });
-    }
+    const newAgents: Agent[] = [];
+    const positions = [
+      { x: 100, y: 120 },
+      { x: 100, y: 200 },
+      { x: 100, y: 280 },
+      { x: 100, y: 360 },
+      { x: 100, y: 440 },
+    ];
+    const types: ('DEFENDER' | 'SNIPER')[] = ['DEFENDER', 'DEFENDER', 'SNIPER', 'SNIPER', 'DEFENDER'];
+    positions.forEach((pos, i) => {
+      const personality: 'AGGRESSIVE' | 'DEFENSIVE' = i % 2 === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
+      newAgents.push(createAgent(generateId(), { type: types[i], position: pos, personality }));
+    });
+    set({
+      agents: newAgents,
+      isRunning: true,
+      phase: 'FIGHT',
+      wave: 1,
+      enemySpawnTimer: 0,
+      score: 0,
+      kills: 0,
+      gold: 500,
+      elixir: 5,
+      lives: 5,
+      remainingAgentsToPlace: 0,
+      gameOverStats: null
+    });
   },
 
   startPlacement: () => {

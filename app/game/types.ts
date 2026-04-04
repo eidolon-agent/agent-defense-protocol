@@ -11,7 +11,7 @@ export type AgentType = 'DEFENDER' | 'SNIPER';
 
 export type AgentPersonality = 'AGGRESSIVE' | 'DEFENSIVE';
 
-export type EnemyType = 'FAST' | 'TANK' | 'HEALER' | 'ARMORED';
+export type EnemyType = 'FAST' | 'TANK' | 'HEALER' | 'ARMORED' | 'BOSS';
 
 export interface Enemy {
   id: string;
@@ -133,6 +133,8 @@ export interface GameState {
   remainingAgentsToPlace: number;
   lives: number;
   maxLives: number;
+  kills: number;
+  gameOverStats: { kills: number; wave: number; victory: boolean } | null;
 }
 
 export interface AgentBrain {
