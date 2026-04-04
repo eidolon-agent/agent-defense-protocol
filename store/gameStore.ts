@@ -17,7 +17,8 @@ const GOLD_PER_KILL: Record<EnemyType, number> = {
   FAST: 10,
   TANK: 30,
   HEALER: 25,
-  ARMORED: 20
+  ARMORED: 20,
+  BOSS: 100
 };
 
 const UPGRADE_COSTS = {
