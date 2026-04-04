@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   GameState, Agent, Enemy, Bullet, Command, Particle, DamageNumber, ScreenShake, GamePhase,
-  EnemyType, AgentType, AgentAbility
+  EnemyType, AgentAbility, AgentBrain, AgentType
 } from '../app/game/types';
 import {
   createAgent, upgradeAgent, grantUpgradePoint, getEffectiveRange, getEffectiveDamage, getEffectiveFireRate, agentCanShoot, shoot,
@@ -10,8 +10,7 @@ import {
 import {
   createEnemy, moveEnemy, isEnemyDead, damageEnemy, isEnemyPastBase, updateHealer
 } from '../core/enemies/enemy';
-import { decideTarget } from '../core/agents/decision';
-import { useAbility } from '../core/agents/brain';
+import { decideTarget, RuleBasedBrain, useAbility } from '../core/agents/brain';
 
 const GOLD_PER_KILL: Record<EnemyType, number> = {
   FAST: 10,
@@ -29,14 +28,55 @@ const UPGRADE_COSTS = {
 };
 
 const ABILITY_COSTS: Record<AgentType, number> = {
-  DEFENDER: 3, // AOE cost
-  SNIPER: 2   // Slow cost
+  DEFENDER: 3,
+  SNIPER: 2
 };
 
-const AGENT_SELL_VALUE = 0.7; // 70% refund
+const AGENT_SELL_VALUE = 0.7;
+
+const PLACEMENT_Y = [120, 200, 280, 360, 440];
+
+const WAVE_COMPOSITION = [
+  { fast: 3, tank: 1, healer: 0, armored: 0, hasBoss: false },
+  { fast: 5, tank: 2, healer: 1, armored: 1, hasBoss: false },
+  { fast: 8, tank: 3, healer: 2, armored: 2, hasBoss: false },
+  { fast: 12, tank: 4, healer: 3, armored: 3, hasBoss: true },
+  { fast: 15, tank: 5, healer: 4, armored: 4, hasBoss: true },
+];
+
+let idCounter = 0;
+const generateId = () => `id-${++idCounter}`;
+
+const createInitialState = (): GameState & { connectedWallet: string | null } => ({
+  agents: [],
+  enemies: [],
+  bullets: [],
+  particles: [],
+  damageNumbers: [],
+  screenShake: null,
+  currentCommand: 'BASE',
+  wave: 1,
+  score: 0,
+  gold: 500,
+  elixir: 5,
+  maxElixir: 10,
+  elixirRegenRate: 1,
+  enemySpawnTimer: 0,
+  gameTime: 0,
+  isRunning: false,
+  phase: 'PLACEMENT',
+  placementTime: 30,
+  upgradeSelection: null,
+  availableUpgradePoints: 0,
+  maxAgents: 5,
+  remainingAgentsToPlace: 5,
+  lives: 5,
+  maxLives: 5,
+  connectedWallet: null
+});
 
 interface GameStore extends GameState {
-  // Actions
+  connectedWallet: string | null;
   setCommand: (cmd: Command) => void;
   startGame: () => void;
   startPlacement: () => void;
@@ -52,85 +92,46 @@ interface GameStore extends GameState {
   createDamageNumber: (x: number, y: number, value: number, color: string) => void;
   shakeScreen: (intensity: number, duration: number) => void;
   sellAgent: (agentId: string) => void;
-  applyAbilityEffect: (effect: { x: number; y: number; radius: number; damage: number; type: string; effect?: { type: 'SLOW' | 'BUFF'; amount: number; duration: number } }) => void;
+  setWalletAddress: (address: string | null) => void;
+  saveGame: (address: string) => void;
+  loadGame: (address: string) => boolean;
 }
-
-// Generate unique IDs
-let idCounter = 0;
-const generateId = () => `id-${++idCounter}`;
-
-// Available agent placements (lane positions)
-const PLACEMENT_Y = [120, 200, 280, 360, 440];
-
-// Enemy wave compositions (by wave)
-const WAVE_COMPOSITION = [
-  { fast: 3, tank: 1, healer: 0, armored: 0, boss: 0 },
-  { fast: 5, tank: 2, healer: 1, armored: 1, boss: 0 },
-  { fast: 8, tank: 3, healer: 2, armored: 2, boss: 0 },
-  { fast: 12, tank: 4, healer: 3, armored: 3, boss: 1 },
-  { fast: 15, tank: 5, healer: 4, armored: 4, boss: 2 },
-];
-
-const createInitialState = (): GameState => ({
-  agents: [],
-  enemies: [],
-  bullets: [],
-  particles: [],
-  damageNumbers: [],
-  screenShake: null,
-  currentCommand: 'BASE',
-  wave: 1,
-  score: 0,
-  gold: 500, // starting gold
-  elixir: 5,
-  maxElixir: 10,
-  elixirRegenRate: 1, // per second
-  enemySpawnTimer: 0,
-  gameTime: 0,
-  isRunning: false,
-  phase: 'PLACEMENT',
-  placementTime: 30,
-  upgradeSelection: null,
-  availableUpgradePoints: 0,
-  maxAgents: 5,
-  remainingAgentsToPlace: 5,
-  lives: 5,
-  maxLives: 5
-});
 
 export const useGameStore = create<GameStore>((set, get) => ({
   ...createInitialState(),
 
-  setCommand: (cmd: Command) => set({ currentCommand: cmd }),
+  setCommand: (cmd) => set({ currentCommand: cmd }),
 
   startGame: () => {
-    const newAgents: Agent[] = [];
-    const positions = [
-      { x: 100, y: 120 },
-      { x: 100, y: 200 },
-      { x: 100, y: 280 },
-      { x: 100, y: 360 },
-      { x: 100, y: 440 },
-    ];
-    const types: ('DEFENDER' | 'SNIPER')[] = ['DEFENDER', 'DEFENDER', 'SNIPER', 'SNIPER', 'DEFENDER'];
-    positions.forEach((pos, i) => {
-      const personality: 'AGGRESSIVE' | 'DEFENSIVE' = i % 2 === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
-      newAgents.push(createAgent(generateId(), { type: types[i], position: pos, personality }));
-    });
-    set({
-      agents: newAgents,
-      isRunning: true,
-      phase: 'FIGHT',
-      wave: 1,
-      enemySpawnTimer: 0,
-      score: 0,
-      kills: 0,
-      gold: 500,
-      elixir: 5,
-      lives: 5,
-      remainingAgentsToPlace: 0,
-      gameOverStats: null
-    });
+    const state = get();
+    if (state.agents.length === 0) {
+      const newAgents: Agent[] = [];
+      const positions = [
+        { x: 100, y: 120 },
+        { x: 100, y: 200 },
+        { x: 100, y: 280 },
+        { x: 100, y: 360 },
+        { x: 100, y: 440 },
+      ];
+      const types: ('DEFENDER' | 'SNIPER')[] = ['DEFENDER', 'DEFENDER', 'SNIPER', 'SNIPER', 'DEFENDER'];
+      positions.forEach((pos, i) => {
+        const personality: 'AGGRESSIVE' | 'DEFENSIVE' = i % 2 === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
+        newAgents.push(createAgent(generateId(), { type: types[i], position: pos, personality }));
+      });
+      set({
+        agents: newAgents,
+        isRunning: true,
+        phase: 'FIGHT',
+        wave: 1,
+        enemySpawnTimer: 0,
+        gold: 500,
+        elixir: 5,
+        lives: 5,
+        remainingAgentsToPlace: 0
+      });
+    } else {
+      set({ phase: 'FIGHT', wave: 1, enemySpawnTimer: 0, gameTime: 0, isRunning: true });
+    }
   },
 
   startPlacement: () => {
@@ -139,32 +140,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   placeAgent: (type, x, y) => {
     const state = get();
-    console.log('[DEBUG] placeAgent', { type, x, y, phase: state.phase, remaining: state.remainingAgentsToPlace, gold: state.gold, agentsCount: state.agents.length });
-    if (state.phase !== 'PLACEMENT') {
-      console.log('[DEBUG] reject: not PLACEMENT');
-      return;
-    }
-    if (state.remainingAgentsToPlace <= 0) {
-      console.log('[DEBUG] reject: none remaining');
-      return;
-    }
+    if (state.phase !== 'PLACEMENT') return;
+    if (state.remainingAgentsToPlace <= 0) return;
+    const occupied = state.agents.some(a => Math.abs(a.position.x - x) < 30 && Math.abs(a.position.y - y) < 30);
+    if (occupied) return;
     const cost = type === 'DEFENDER' ? 40 : 60;
-    if (state.gold < cost) {
-      console.log('[DEBUG] reject: insufficient gold');
-      return;
-    }
-
-    // Simple placement: directly at clicked position (left side enforced in UI)
+    if (state.gold < cost) return;
     const defenders = state.agents.filter(a => a.type === 'DEFENDER').length;
     const snipers = state.agents.filter(a => a.type === 'SNIPER').length;
     const personality: 'AGGRESSIVE' | 'DEFENSIVE' =
       (type === 'DEFENDER' ? defenders % 2 : snipers % 2) === 0 ? 'AGGRESSIVE' : 'DEFENSIVE';
-
     const newAgent = createAgent(generateId(), { type, position: { x, y }, personality });
-
     set(state => {
       const newRemaining = state.remainingAgentsToPlace - 1;
-      console.log('[DEBUG] setState newRemaining:', newRemaining, 'agents before:', state.agents.length);
       return {
         agents: [...state.agents, newAgent],
         remainingAgentsToPlace: newRemaining,
@@ -202,10 +190,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!selection) return;
     const agent = state.agents.find(a => a.id === selection.agentId);
     if (!agent || agent.upgradePoints <= 0) return;
-
     const cost = UPGRADE_COSTS[type];
     if (state.gold < cost) return;
-
     if (upgradeAgent(agent, type)) {
       set(state => ({
         agents: [...state.agents],
@@ -215,11 +201,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  selectAgentForUpgrade: (agentId: string | null) => {
-    if (agentId === null) {
-      set({ upgradeSelection: null });
-      return;
-    }
+  selectAgentForUpgrade: (agentId) => {
     const agent = get().agents.find(a => a.id === agentId);
     if (agent && (agent.upgradePoints > 0 || agent.ability)) {
       set({ upgradeSelection: { agentId, type: 'damage' } });
@@ -278,57 +260,104 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const state = get();
     const agent = state.agents.find(a => a.id === agentId);
     if (!agent) return;
-    const refund = Math.floor(50 * AGENT_SELL_VALUE); // base value * refund rate
-
+    const refund = Math.floor(50 * AGENT_SELL_VALUE);
     set(state => ({
       agents: state.agents.filter(a => a.id !== agentId),
       gold: state.gold + refund
     }));
   },
 
+  setWalletAddress: (address) => {
+    set({ connectedWallet: address });
+  },
+
+  saveGame: (address) => {
+    const state = get();
+    if (!address) return;
+    const saveData = {
+      agents: state.agents.map(a => ({
+        id: a.id,
+        type: a.type,
+        position: a.position,
+        personality: a.personality,
+        level: a.level,
+        rangeMult: a.rangeMult,
+        damageMult: a.damageMult,
+        fireRateMult: a.fireRateMult,
+        abilityCooldown: a.abilityCooldown,
+        ability: a.ability
+      })),
+      gold: state.gold,
+      lives: state.lives,
+      score: state.score,
+      wave: state.wave,
+      currentCommand: state.currentCommand,
+      elixir: state.elixir
+    };
+    try {
+      localStorage.setItem(`adp_save_${address.toLowerCase()}`, JSON.stringify(saveData));
+    } catch (e) {
+      console.error('Save failed', e);
+    }
+  },
+
+  loadGame: (address) => {
+    if (!address) return false;
+    try {
+      const saved = localStorage.getItem(`adp_save_${address.toLowerCase()}`);
+      if (!saved) return false;
+      const data = JSON.parse(saved);
+      const agents = data.agents.map((a: any) => ({
+        ...a,
+        brain: new RuleBasedBrain() as AgentBrain,
+        lastShot: 0,
+        lastThought: 'Loaded',
+        thoughtTimer: 0,
+        radius: a.type === 'DEFENDER' ? 15 : 12,
+        color: a.type === 'DEFENDER' ? '#3b82f6' : '#10b981',
+        upgradePoints: 0
+      }));
+      set({
+        agents,
+        gold: data.gold,
+        lives: data.lives,
+        score: data.score,
+        wave: data.wave,
+        currentCommand: data.currentCommand || 'BASE',
+        elixir: data.elixir,
+        isRunning: false,
+        phase: 'BETWEEN_WAVES',
+        remainingAgentsToPlace: 0
+      });
+      return true;
+    } catch (e) {
+      console.error('Load failed', e);
+      return false;
+    }
+  },
+
   applyAbilityEffect: (effect) => {
     const { x, y, radius, damage, type } = effect;
     const state = get();
-    const updatedEnemies = state.enemies.map(e => {
+    const affectedEnemies = state.enemies.filter(e => {
       const dist = Math.hypot(e.position.x - x, e.position.y - y);
-      if (dist <= radius && e.currentHp > 0) {
+      return dist <= radius && e.currentHp > 0;
+    });
+    const updatedEnemies = state.enemies.map(e => {
+      if (affectedEnemies.some(ae => ae.id === e.id)) {
         damageEnemy(e, damage);
       }
       return e;
     });
-
-    // Create particles inline
-    const particleColor = type === 'AOE' ? '#ef4444' : type === 'SLOW' ? '#3b82f6' : '#10b981';
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < 15; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 20 + Math.random() * 30;
-      newParticles.push({
-        id: generateId(),
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.5 + Math.random() * 0.5,
-        maxLife: 0.5 + Math.random() * 0.5,
-        color: particleColor,
-        size: 2 + Math.random() * 3,
-        type: type === 'AOE' ? 'aoe' : type === 'SLOW' ? 'slow' : 'buff'
-      });
-    }
-
-    set(state => ({
-      enemies: updatedEnemies,
-      particles: [...state.particles, ...newParticles]
-    }));
+    get().createParticle(x, y, type === 'AOE' ? '#ef4444' : type === 'SLOW' ? '#3b82f6' : '#10b981', 15);
+    set({ enemies: updatedEnemies });
   },
 
   update: (deltaTime) => {
     const state = get();
     if (!state.isRunning) return;
-
     const now = performance.now();
 
-    // Handle phase
     if (state.phase === 'PLACEMENT') {
       const remaining = Math.max(0, state.placementTime - deltaTime);
       set({ placementTime: remaining });
@@ -339,7 +368,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         for (let i = 0; i < needed; i++) {
           const type: 'DEFENDER' | 'SNIPER' = i % 2 === 0 ? 'DEFENDER' : 'SNIPER';
           const y = PLACEMENT_Y[Math.floor(Math.random() * PLACEMENT_Y.length)];
-          if (state.gold >= (type === 'DEFENDER' ? 50 : 80)) {
+          if (state.gold >= (type === 'DEFENDER' ? 40 : 60)) {
             state.addAgent(type, 100, y, i % 2 === 0 ? 'AGGRESSIVE' : 'DEFENSIVE');
           }
         }
@@ -350,47 +379,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     if (state.phase === 'BETWEEN_WAVES') return;
 
-    // Screen shake decay
     let newShake = state.screenShake;
     if (newShake) {
       newShake = { ...newShake, elapsed: newShake.elapsed + deltaTime };
       if (newShake.elapsed >= newShake.duration) newShake = null;
     }
 
-    // 1. Move enemies & healers
     const movedEnemies = state.enemies.map(e => {
       moveEnemy(e, deltaTime);
       updateHealer(e, state.enemies, deltaTime);
       return e;
     });
 
-    // 2. Update agent thoughts (clone & mutate for immutability)
-    const updatedAgents = state.agents.map(agent => {
-      const clone = { ...agent };
-      updateAgentThought(clone, movedEnemies, state.currentCommand, deltaTime);
-      return clone;
-    });
+    const updatedAgents = state.agents.map(agent => ({
+      ...agent,
+      lastThought: updateAgentThought(agent, movedEnemies, state.currentCommand, deltaTime)
+    }));
 
-    // Elixir regeneration
-    let currentElixir = state.elixir + state.elixirRegenRate * deltaTime;
-
-    // 3. Agents shoot + abilities
     const newBullets: Bullet[] = [...state.bullets];
     const abilitiesUsed: Array<{ agent: Agent; effect: any }> = [];
 
     updatedAgents.forEach(agent => {
-      // Check ability
       const abilityEffect = useAbility(agent, movedEnemies, now);
       if (abilityEffect) {
-        const cost = agent.type === 'DEFENDER' ? 3 : 2; // Defender AOE costs 3, Sniper Slow costs 2
-        if (currentElixir >= cost) {
-          abilitiesUsed.push({ agent, effect: abilityEffect });
-          currentElixir -= cost;
-        }
+        abilitiesUsed.push({ agent, effect: abilityEffect });
       }
-
       if (!agentCanShoot(agent, now)) return;
-
       const target = decideTarget(agent, movedEnemies, state.currentCommand);
       if (target) {
         shoot(agent, target, now);
@@ -406,17 +420,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     });
 
-    // Apply ability effects
-    abilitiesUsed.forEach(({ effect }) => {
-      get().applyAbilityEffect(effect);
-    });
+    let newElixir = state.elixir + state.elixirRegenRate * deltaTime;
+    if (newElixir > state.maxElixir) newElixir = state.maxElixir;
 
-    // 4. Move bullets
+    const totalAbilityCost = abilitiesUsed.reduce((sum, { agent }) => sum + ABILITY_COSTS[agent.type], 0);
+    if (newElixir >= totalAbilityCost) {
+      newElixir -= totalAbilityCost;
+      abilitiesUsed.forEach(({ effect }) => {
+        get().applyAbilityEffect(effect);
+      });
+    }
+
     const updatedBullets = newBullets.map(bullet => {
       const moveDist = bullet.speed * deltaTime;
       const totalDist = Math.hypot(bullet.to.x - bullet.from.x, bullet.to.y - bullet.from.y);
       bullet.progress += moveDist / totalDist;
-
       if (bullet.progress >= 1) {
         const target = movedEnemies.find(e => e.id === bullet.targetId);
         if (target) {
@@ -432,11 +450,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return bullet;
     }).filter(Boolean) as Bullet[];
 
-    // 5. Clean up dead enemies
     const aliveEnemies = movedEnemies.filter(e => !isEnemyDead(e));
     const deadEnemies = movedEnemies.filter(e => isEnemyDead(e));
 
-    // Award gold and score for kills
     let newGold = state.gold;
     let newScore = state.score;
     deadEnemies.forEach(e => {
@@ -444,18 +460,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
       newScore += GOLD_PER_KILL[e.type] * 2;
     });
 
-    // 6. Enemies reaching base
     const canvasWidth = 1000;
     const breaches = aliveEnemies.filter(e => isEnemyPastBase(e, canvasWidth));
     if (breaches.length > 0) {
       set({ lives: state.lives - breaches.length });
       if (state.lives - breaches.length <= 0) {
-        set({ isRunning: false, phase: 'BETWEEN_WAVES' });
+        set({ isRunning: false, phase: 'GAME_OVER' });
         return;
       }
     }
 
-    // 7. Spawning logic
     let spawnTimer = state.enemySpawnTimer - deltaTime;
     let currentWave = state.wave;
 
@@ -465,18 +479,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         set({ phase: 'BETWEEN_WAVES', enemies: [], bullets: [], isRunning: false });
         return;
       }
-
       const pointsAwarded = 1 + Math.floor(currentWave / 2);
       const agentsWithPoints = updatedAgents.map(a => ({
         ...a,
         upgradePoints: a.upgradePoints + pointsAwarded
       }));
-
       set({
         agents: agentsWithPoints,
         phase: 'BETWEEN_WAVES',
         wave: currentWave + 1,
-        gold: state.gold, // keep gold
+        gold: state.gold,
         availableUpgradePoints: pointsAwarded * agentsWithPoints.length,
         enemySpawnTimer: 10
       });
@@ -488,7 +500,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       spawnTimer = 3;
     }
 
-    // 8. Update particles (gravity, fade)
     const movedParticles = state.particles.map(p => ({
       ...p,
       x: p.x + p.vx * deltaTime,
@@ -497,7 +508,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       life: p.life - deltaTime
     })).filter(p => p.life > 0);
 
-    // 9. Update damage numbers (float up, fade)
     const updatedDamageNumbers = state.damageNumbers.map(dn => ({
       ...dn,
       y: dn.y - 30 * deltaTime,
@@ -513,6 +523,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       screenShake: newShake,
       score: newScore,
       gold: newGold,
+      elixir: newElixir,
       enemySpawnTimer: spawnTimer,
       wave: currentWave,
       gameTime: state.gameTime + deltaTime
