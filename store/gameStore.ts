@@ -10,7 +10,8 @@ import {
 import {
   createEnemy, moveEnemy, isEnemyDead, damageEnemy, isEnemyPastBase, updateHealer
 } from '../core/enemies/enemy';
-import { decideTarget, RuleBasedBrain, useAbility } from '../core/agents/brain';
+import { decideTarget } from '../core/agents/decision';
+import { RuleBasedBrain, useAbility } from '../core/agents/brain';
 
 const GOLD_PER_KILL: Record<EnemyType, number> = {
   FAST: 10,
