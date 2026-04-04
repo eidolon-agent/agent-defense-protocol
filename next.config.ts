@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    workerMemoryBufferMB: 512,
-  },
+  // Biarkan default Next.js memilih konfigurasi optimal
 };
 
 export default nextConfig;

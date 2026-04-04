@@ -377,7 +377,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // 3. Agents shoot + abilities
     const newBullets: Bullet[] = [...state.bullets];
-    const abilitiesUsed: Array<{ agentId: string; effect: any }> = [];
+    const abilitiesUsed: Array<{ agent: Agent; effect: any }> = [];
 
     updatedAgents.forEach(agent => {
       // Check ability
@@ -385,7 +385,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (abilityEffect) {
         const cost = agent.type === 'DEFENDER' ? 3 : 2; // Defender AOE costs 3, Sniper Slow costs 2
         if (currentElixir >= cost) {
-          abilitiesUsed.push({ agentId: agent.id, effect: abilityEffect });
+          abilitiesUsed.push({ agent, effect: abilityEffect });
           currentElixir -= cost;
         }
       }
